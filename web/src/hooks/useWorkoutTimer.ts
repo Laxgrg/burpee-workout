@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
+  HybridPhaseConfig,
   WorkoutMode,
   WorkoutTimerConfig,
   WorkoutTimerModeConfig,
@@ -72,6 +73,45 @@ export function useWorkoutTimer({
         )
       : null;
 
+  // ── Hybrid state (only when activeMode.mode === "H") ───────────────────────
+  // Derived entirely from secondsLeft — no extra state needed.
+  // Phase 0 (Navy Seals):     secondsLeft > HYBRID_PHASE_DURATION  (first 10 min)
+  // Phase 1 (5-Count Pushups): secondsLeft <= HYBRID_PHASE_DURATION (last 10 min)
+  const HYBRID_PHASE_DURATION = 10 * 60; // 600 seconds
+
+  const hybridState: {
+    phaseIndex: number;
+    phase: HybridPhaseConfig;
+    phaseSecondsLeft: number;
+    phaseSecondsToNextRep: number | null;
+    totalPhases: number;
+  } | null = useMemo(() => {
+    if (activeMode.mode !== "H" || !activeMode.hybridPhases) return null;
+
+    const phases = activeMode.hybridPhases;
+    const elapsed = totalSeconds - secondsLeft;
+    const phaseIndex = elapsed < HYBRID_PHASE_DURATION ? 0 : 1;
+    const phase = phases[phaseIndex];
+
+    // Seconds elapsed within this specific phase
+    const phaseStart = phaseIndex * HYBRID_PHASE_DURATION;
+    const secondsIntoPhase = elapsed - phaseStart;
+    const phaseSecondsLeft = HYBRID_PHASE_DURATION - secondsIntoPhase;
+
+    // Rep pace within the phase
+    const phaseIntervalSec = phase.goal > 0 ? HYBRID_PHASE_DURATION / phase.goal : 0;
+    const phaseSecondsToNextRep =
+      phaseIntervalSec > 0 && currentRep < phase.goal
+        ? Math.max(
+            0,
+            Math.ceil((currentRep + 1) * phaseIntervalSec - secondsIntoPhase),
+          )
+        : null;
+
+    return { phaseIndex, phase, phaseSecondsLeft, phaseSecondsToNextRep, totalPhases: 2 };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeMode.mode, activeMode.hybridPhases, secondsLeft, totalSeconds, currentRep]);
+
   // ── Prepare countdown ──────────────────────────────────────────────
   // ── Prepare: tick the countdown down ──────────────────────────────
   useEffect(() => {
@@ -114,8 +154,85 @@ export function useWorkoutTimer({
       setSecondsLeft((previousValue) => {
         const nextValue = previousValue - 1;
         const clampedNextValue = nextValue < 0 ? 0 : nextValue;
-        const previousTimeElapsed = totalSeconds - previousValue;
-        const timeElapsed = totalSeconds - clampedNextValue;
+        const previousSecondsDone = totalSeconds - previousValue;
+        const currentSecondsDone = totalSeconds - clampedNextValue;
+
+        // ── Hybrid mode: phase-aware rep counting ─────────────────────────
+        // Hybrid total = 20 min; Phase 0 (Navy Seals) = first 10 min,
+        //                         Phase 1 (5-Count)    = next  10 min.
+        if (activeMode.mode === "H" && activeMode.hybridPhases) {
+          const phases = activeMode.hybridPhases;
+          const PHASE_DUR = HYBRID_PHASE_DURATION; // 600 s
+
+          const prevPhaseIdx = previousSecondsDone < PHASE_DUR ? 0 : 1;
+          const currPhaseIdx = currentSecondsDone < PHASE_DUR ? 0 : 1;
+
+          // ── Phase transition: crossed the 10-minute mark ─────────────────
+          if (currPhaseIdx > prevPhaseIdx) {
+            // Reset rep counter for Phase 2 and signal the transition
+            setCurrentRep(0);
+            playWhistle();
+            // Workout is NOT done yet — fall through to return clampedNextValue
+            return clampedNextValue;
+          }
+
+          // ── Rep counting within the current phase ────────────────────────
+          const phase = phases[currPhaseIdx];
+          const phaseStart = currPhaseIdx * PHASE_DUR;
+          const prevIntoPhase = previousSecondsDone - phaseStart;
+          const currIntoPhase = currentSecondsDone - phaseStart;
+
+          if (phase.goal > 0) {
+            const phaseIntervalSec = PHASE_DUR / phase.goal;
+
+            const previousRep = Math.min(
+              phase.goal,
+              Math.floor(prevIntoPhase / phaseIntervalSec + REP_EPSILON),
+            );
+            const rep = Math.min(
+              phase.goal,
+              Math.floor(currIntoPhase / phaseIntervalSec + REP_EPSILON),
+            );
+
+            // Warning beeps 4–1 seconds before next rep boundary
+            const secondsUntilBoundary =
+              rep < phase.goal
+                ? Math.max(
+                    0,
+                    Math.ceil((rep + 1) * phaseIntervalSec - currIntoPhase),
+                  )
+                : null;
+
+            if (
+              secondsUntilBoundary !== null &&
+              secondsUntilBoundary >= 1 &&
+              secondsUntilBoundary <= 4
+            ) {
+              playRepWarningBeep();
+            }
+
+            if (rep > previousRep) {
+              setCurrentRep(rep);
+              playWhistle();
+              onRepBoundaryRef.current?.(rep, phase.mode);
+            }
+          }
+
+          // ── Full workout complete ────────────────────────────────────────
+          if (clampedNextValue === 0) {
+            setIsActive(false);
+            setPhase("done");
+            playFinishWhistle();
+            // Report phase-2 goal as the final rep count for the session
+            onFinishRef.current?.(phases[1].goal, "H");
+          }
+
+          return clampedNextValue;
+        }
+
+        // ── Standard single-phase mode (Navy Seals or 5-Count) ───────────
+        const previousTimeElapsed = previousSecondsDone;
+        const timeElapsed = currentSecondsDone;
 
         if (intervalSeconds > 0) {
           const previousRep = Math.min(
@@ -172,7 +289,7 @@ export function useWorkoutTimer({
     }, 1000);
 
     return () => clearInterval(timerId);
-  }, [activeMode.goal, activeMode.mode, intervalSeconds, isActive, secondsLeft, totalSeconds]);
+  }, [activeMode.goal, activeMode.mode, activeMode.hybridPhases, intervalSeconds, isActive, secondsLeft, totalSeconds]);
 
   const resetTimer = () => {
     setIsActive(false);
@@ -228,6 +345,8 @@ export function useWorkoutTimer({
     secondsToNextRep,
     phase,
     prepareSecondsLeft,
+    /** Non-null only when activeMode.mode === "H". Contains phase-specific display values. */
+    hybridState,
     toggleTimer,
     resetTimer,
     selectMode,

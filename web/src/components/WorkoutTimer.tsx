@@ -10,6 +10,7 @@ import VideocamIcon from "@mui/icons-material/Videocam";
 import {
   buildWorkoutTimerConfig,
   formatWorkoutTimerTime,
+  WorkoutMode,
 } from "../../../shared/workoutTimer";
 import { useWorkoutTimer } from "../hooks/useWorkoutTimer";
 import { WorkoutTier } from "../types";
@@ -18,6 +19,8 @@ interface WorkoutTimerProps {
   tier: WorkoutTier;
   sealsGoal?: number;
   sixCountsGoal?: number;
+  /** Preset the active mode tab (e.g. "H" on Fridays for advanced track) */
+  defaultMode?: WorkoutMode;
   onFinish?: (repsCompleted: number, mode: string) => void;
   onOpenVideo?: () => void;
 }
@@ -26,6 +29,7 @@ export default function WorkoutTimer({
   tier,
   sealsGoal = 0,
   sixCountsGoal = 0,
+  defaultMode,
   onFinish,
   onOpenVideo,
 }: WorkoutTimerProps) {
@@ -35,8 +39,9 @@ export default function WorkoutTimer({
         tier,
         sealsGoal,
         sixCountsGoal,
+        defaultMode,
       }),
-    [sealsGoal, sixCountsGoal, tier],
+    [sealsGoal, sixCountsGoal, tier, defaultMode],
   );
 
   const {
@@ -48,6 +53,7 @@ export default function WorkoutTimer({
     secondsToNextRep,
     phase,
     prepareSecondsLeft,
+    hybridState,
     toggleTimer,
     resetTimer,
     selectMode,
@@ -58,6 +64,7 @@ export default function WorkoutTimer({
 
   const isBeginnerTrack = tier === "beginner";
   const isPreparing = phase === "prepare";
+  const isHybridMode = activeMode.mode === "H";
 
   return (
     <Card
@@ -125,13 +132,48 @@ export default function WorkoutTimer({
             GET READY
           </Typography>
         </Box>
+      ) : isHybridMode && hybridState ? (
+        // ── Hybrid mode display ──────────────────────────────────────────
+        <Box textAlign="center">
+          {/* Phase label */}
+          <Typography variant="subtitle2" color="text.secondary" fontWeight={700} mb={0.5}>
+            Phase {hybridState.phaseIndex + 1} of {hybridState.totalPhases}:{" "}
+            {hybridState.phase.label}
+          </Typography>
+
+          {/* Phase countdown (resets to 10:00 for each phase) */}
+          <Typography variant="h2" fontWeight={900} color="primary.main">
+            {formatWorkoutTimerTime(hybridState.phaseSecondsLeft)}
+          </Typography>
+
+          {/* Total workout time remaining */}
+          <Typography variant="caption" color="text.disabled" sx={{ display: "block", mt: 0.25 }}>
+            Total: {formatWorkoutTimerTime(secondsLeft)} remaining
+          </Typography>
+
+          {/* Rep counter for the current phase */}
+          {hybridState.phase.goal > 0 && (
+            <Box mt={0.5}>
+              <Typography variant="subtitle2" color="secondary.main" fontWeight={800}>
+                REP {currentRep} / {hybridState.phase.goal}
+              </Typography>
+              {isActive && hybridState.phaseSecondsToNextRep !== null && (
+                <Typography variant="body2" color="text.secondary">
+                  Next in {hybridState.phaseSecondsToNextRep}s
+                </Typography>
+              )}
+            </Box>
+          )}
+        </Box>
       ) : (
+        // ── Standard single-phase display ────────────────────────────────
         <Typography variant="h2" fontWeight={900} color="primary.main">
           {formatWorkoutTimerTime(secondsLeft)}
         </Typography>
       )}
 
-      {!isPreparing && activeMode.goal > 0 ? (
+      {/* ── Rep counter for standard (non-hybrid, non-prepare) modes ────── */}
+      {!isPreparing && !isHybridMode && activeMode.goal > 0 ? (
         <Box>
           <Typography
             variant="subtitle2"
@@ -146,7 +188,7 @@ export default function WorkoutTimer({
             </Typography>
           )}
         </Box>
-      ) : !isPreparing ? (
+      ) : !isPreparing && !isHybridMode ? (
         <Typography variant="body2" color="text.secondary">
           Beginner uses the selected level target for this 20-minute session.
         </Typography>

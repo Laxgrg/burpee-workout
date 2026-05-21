@@ -28,6 +28,7 @@ import {
   UserData,
   WorkoutLog,
 } from "../types";
+import { WorkoutMode } from "../../../shared/workoutTimer";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   addMonths,
@@ -98,6 +99,17 @@ export default function Dashboard({
   const milestoneDate = addMonths(startDate, 6);
   const today = new Date();
   const todayStr = format(today, "yyyy-MM-dd");
+
+  // ── Day-of-week default timer mode (Advanced Track only) ──────────────────
+  // Mon → Navy Seals ("N"), Wed → 5-Count Pushups ("C"), Fri → Hybrid ("H")
+  const todayDayName = format(today, "EEE"); // "Mon" | "Tue" | ... | "Sun"
+  const defaultTimerMode: WorkoutMode = isAdvancedTrack
+    ? todayDayName === "Fri"
+      ? "H"
+      : todayDayName === "Wed"
+        ? "C"
+        : "N"
+    : "C"; // beginner always uses "C" (single mode, ignored by buildWorkoutTimerConfig)
 
   const isMilestoneReached = isAfter(today, milestoneDate) && !userData.endDate;
   const daysPassed = differenceInDays(today, startDate);
@@ -530,10 +542,13 @@ export default function Dashboard({
               tier={workoutTier}
               sealsGoal={currentLevel?.seals ?? 0}
               sixCountsGoal={currentLevel?.sixCounts ?? 0}
+              defaultMode={defaultTimerMode}
               onOpenVideo={() => setOpenVideo(true)}
               onFinish={(repsCompleted, mode) => {
                 if (onToggleWorkout) {
-                  const modeType = mode === "N" ? "N" : "C";
+                  // Map WorkoutMode → toggle type. "H" (Hybrid) is treated
+                  // as "N" for log compatibility (it includes Navy Seals).
+                  const modeType: "N" | "C" = mode === "N" ? "N" : mode === "H" ? "N" : "C";
                   onToggleWorkout(todayStr, true, modeType, repsCompleted);
                 }
               }}

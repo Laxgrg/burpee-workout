@@ -143,8 +143,13 @@ export function useUserData() {
       ...(log.repsCompleted !== undefined ? { repsCompleted: log.repsCompleted } : {}),
     }));
 
+    const workoutStats = {
+      workoutsCompleted: safeLogs.filter((l) => l.completed).length,
+      timerVerified: safeLogs.filter((l) => l.completed && l.repsCompleted !== undefined).length,
+    };
+
     try {
-      await saveUserData({ workoutLogs: safeLogs });
+      await saveUserData({ workoutLogs: safeLogs, workoutStats });
     } catch (e) {
       console.warn("Handled save error:", e);
     }

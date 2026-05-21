@@ -28,6 +28,10 @@ export interface UserData {
 
   isGraduated?: boolean;
   workoutLogs?: WorkoutLog[];
+  workoutStats?: {
+    workoutsCompleted: number;
+    timerVerified: number;
+  };
   currentLevelId?: string;
 
   // Stripe subscription

@@ -88,12 +88,14 @@ export async function GET(req: NextRequest) {
         level: data.currentLevelId ?? "",
         startDate: data.startDate ?? "",
         onboarded: !!data.startDate,
-        workoutsCompleted: ((data.workoutLogs ?? []) as { completed?: boolean }[]).filter(
-          (l) => l.completed
-        ).length,
-        timerVerified: ((data.workoutLogs ?? []) as { completed?: boolean; repsCompleted?: number }[]).filter(
-          (l) => l.completed && l.repsCompleted !== undefined
-        ).length,
+        workoutsCompleted: data.workoutStats?.workoutsCompleted
+          ?? ((data.workoutLogs ?? []) as { completed?: boolean }[]).filter(
+              (l) => l.completed
+            ).length,
+        timerVerified: data.workoutStats?.timerVerified
+          ?? ((data.workoutLogs ?? []) as { completed?: boolean; repsCompleted?: number }[]).filter(
+              (l) => l.completed && l.repsCompleted !== undefined
+            ).length,
       };
     });
 

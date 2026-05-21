@@ -36,6 +36,10 @@ export const logWorkoutDB = async (userId: string, targetDate: string, completed
     logs.push({ date: targetDate, completed });
   }
 
-  await updateDoc(docRef, { workoutLogs: logs });
+  const workoutStats = {
+    workoutsCompleted: logs.filter((l) => l.completed).length,
+    timerVerified: logs.filter((l) => l.completed && l.repsCompleted !== undefined).length,
+  };
+  await updateDoc(docRef, { workoutLogs: logs, workoutStats });
   return logs;
 };

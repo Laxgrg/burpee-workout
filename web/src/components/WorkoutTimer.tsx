@@ -1,12 +1,13 @@
 "use client";
 
-import React, { useMemo } from "react";
+import React, { useCallback, useMemo, useState } from "react";
 import { Box, Button, Card, Chip, Stack, Typography } from "@mui/material";
 import PlayArrowIcon from "@mui/icons-material/PlayArrow";
 import PauseIcon from "@mui/icons-material/Pause";
 import ReplayIcon from "@mui/icons-material/Replay";
 import TimerOutlinedIcon from "@mui/icons-material/TimerOutlined";
 import VideocamIcon from "@mui/icons-material/Videocam";
+import FitnessCenterIcon from "@mui/icons-material/FitnessCenter";
 import {
   buildWorkoutTimerConfig,
   formatWorkoutTimerTime,
@@ -23,6 +24,8 @@ interface WorkoutTimerProps {
   defaultMode?: WorkoutMode;
   onFinish?: (repsCompleted: number, mode: string) => void;
   onOpenVideo?: () => void;
+  onShowWarmup?: () => void;
+  onShowCooldown?: () => void;
 }
 
 export default function WorkoutTimer({
@@ -32,6 +35,8 @@ export default function WorkoutTimer({
   defaultMode,
   onFinish,
   onOpenVideo,
+  onShowWarmup,
+  onShowCooldown,
 }: WorkoutTimerProps) {
   const timerConfig = useMemo(
     () =>
@@ -62,9 +67,41 @@ export default function WorkoutTimer({
     onFinish,
   });
 
+  // ── Warmup prompt state ──────────────────────────────────────────────────
+  const [warmupChecked, setWarmupChecked] = useState(false);
+  const [showWarmupPrompt, setShowWarmupPrompt] = useState(false);
+
   const isBeginnerTrack = tier === "beginner";
   const isPreparing = phase === "prepare";
+  const isDone = phase === "done";
   const isHybridMode = activeMode.mode === "H";
+  const isIdle = phase === "idle";
+
+  // Intercept the first Start press to ask about warm-up
+  const handleStartClick = useCallback(() => {
+    if (!warmupChecked && !isActive && !isPreparing && phase !== "done") {
+      setShowWarmupPrompt(true);
+      return;
+    }
+    toggleTimer();
+  }, [warmupChecked, isActive, isPreparing, phase, toggleTimer]);
+
+  const handleConfirmWarmup = useCallback(() => {
+    setWarmupChecked(true);
+    setShowWarmupPrompt(false);
+    toggleTimer();
+  }, [toggleTimer]);
+
+  const handleShowWarmupFromPrompt = useCallback(() => {
+    setShowWarmupPrompt(false);
+    onShowWarmup?.();
+  }, [onShowWarmup]);
+
+  const handleResetTimer = useCallback(() => {
+    setWarmupChecked(false);
+    setShowWarmupPrompt(false);
+    resetTimer();
+  }, [resetTimer]);
 
   return (
     <Card
@@ -194,37 +231,120 @@ export default function WorkoutTimer({
         </Typography>
       ) : null}
 
-      <Stack direction="row" spacing={1.5}>
-        <Button
-          variant="contained"
-          startIcon={
-            isPreparing ? (
-              <PauseIcon />
-            ) : isActive ? (
-              <PauseIcon />
-            ) : (
-              <PlayArrowIcon />
-            )
-          }
-          onClick={toggleTimer}
-          color={isPreparing ? "warning" : "primary"}
+      {/* ── Idle warm-up reminder ────────────────────────────────────────── */}
+      {isIdle && !showWarmupPrompt && (
+        <Typography
+          variant="caption"
+          sx={{
+            color: "text.secondary",
+            fontStyle: "italic",
+            display: "flex",
+            alignItems: "center",
+            gap: 0.5,
+          }}
         >
-          {isPreparing
-            ? "Cancel"
-            : isActive
-              ? "Pause"
-              : phase === "done"
-                ? "Restart"
-                : "Start"}
-        </Button>
-        <Button
-          variant="outlined"
-          startIcon={<ReplayIcon />}
-          onClick={resetTimer}
+          <FitnessCenterIcon sx={{ fontSize: 14 }} />
+          Warm up first. Train smart.
+        </Typography>
+      )}
+
+      {/* ── "Did you warm up?" prompt ────────────────────────────────────── */}
+      {showWarmupPrompt ? (
+        <Box
+          sx={{
+            border: "1px solid",
+            borderColor: "warning.main",
+            borderRadius: 2,
+            p: 2,
+            textAlign: "center",
+            width: "100%",
+          }}
         >
-          Reset
-        </Button>
-      </Stack>
+          <Typography variant="subtitle2" fontWeight={700} color="warning.main" mb={1.5}>
+            Did you warm up?
+          </Typography>
+          <Stack spacing={1}>
+            <Button
+              variant="contained"
+              color="primary"
+              size="small"
+              startIcon={<PlayArrowIcon />}
+              onClick={handleConfirmWarmup}
+            >
+              Yes, Start Workout
+            </Button>
+            <Button
+              variant="outlined"
+              color="warning"
+              size="small"
+              startIcon={<FitnessCenterIcon />}
+              onClick={handleShowWarmupFromPrompt}
+            >
+              Show Warm-up
+            </Button>
+          </Stack>
+        </Box>
+      ) : (
+        /* ── Normal control buttons ───────────────────────────────────── */
+        <Stack direction="row" spacing={1.5}>
+          <Button
+            variant="contained"
+            startIcon={
+              isPreparing ? (
+                <PauseIcon />
+              ) : isActive ? (
+                <PauseIcon />
+              ) : (
+                <PlayArrowIcon />
+              )
+            }
+            onClick={handleStartClick}
+            color={isPreparing ? "warning" : "primary"}
+          >
+            {isPreparing
+              ? "Cancel"
+              : isActive
+                ? "Pause"
+                : phase === "done"
+                  ? "Restart"
+                  : "Start"}
+          </Button>
+          <Button
+            variant="outlined"
+            startIcon={<ReplayIcon />}
+            onClick={handleResetTimer}
+          >
+            Reset
+          </Button>
+        </Stack>
+      )}
+
+      {/* ── Post-workout cool-down reminder ─────────────────────────────── */}
+      {isDone && !showWarmupPrompt && (
+        <Box
+          sx={{
+            border: "1px solid",
+            borderColor: "success.main",
+            borderRadius: 2,
+            p: 1.5,
+            textAlign: "center",
+            width: "100%",
+          }}
+        >
+          <Typography variant="subtitle2" fontWeight={700} color="success.main" mb={1}>
+            Great job. Cool down for 5–10 min. 🎉
+          </Typography>
+          <Button
+            variant="outlined"
+            color="success"
+            size="small"
+            startIcon={<FitnessCenterIcon />}
+            onClick={onShowCooldown}
+          >
+            Show Cool-down
+          </Button>
+        </Box>
+      )}
 
       <Button
         variant="text"

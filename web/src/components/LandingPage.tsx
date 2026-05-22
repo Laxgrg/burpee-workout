@@ -419,6 +419,42 @@ export default function LandingPage() {
           </Grid>
         </Grid>
 
+        {/* App availability banner */}
+        <Box
+          sx={{
+            mt: 4,
+            p: 3,
+            borderRadius: 2,
+            border: "1px solid rgba(255,51,102,0.3)",
+            background: "rgba(255,51,102,0.05)",
+            display: "flex",
+            alignItems: "center",
+            gap: 2,
+            flexWrap: "wrap",
+          }}
+        >
+          <Box sx={{ flex: 1, minWidth: 200 }}>
+            <Typography variant="subtitle1" fontWeight={700} mb={0.5}>
+              📱 Available on iOS
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              Track your workouts on the go. Your progress syncs automatically between web and iPhone.
+              Android coming soon.
+            </Typography>
+          </Box>
+          <Stack direction="row" spacing={1} flexWrap="wrap">
+            <Chip
+              label="iOS — Available"
+              sx={{ bgcolor: "rgba(255,51,102,0.15)", color: "primary.main", fontWeight: 600 }}
+            />
+            <Chip
+              label="Android — Coming Soon"
+              variant="outlined"
+              sx={{ borderColor: "rgba(255,255,255,0.2)", color: "text.secondary" }}
+            />
+          </Stack>
+        </Box>
+
         <Alert
           severity="warning"
           sx={{ mt: 4, borderRadius: 2 }}
@@ -436,6 +472,19 @@ export default function LandingPage() {
             through levels is never required.
           </Typography>
         </Alert>
+
+        {/* Footer */}
+        <Box sx={{ mt: 6, textAlign: "center" }}>
+          <Typography variant="caption" color="text.disabled">
+            © {new Date().getFullYear()} BurpeePacers ·{" "}
+            <a
+              href="/privacy"
+              style={{ color: "inherit", textDecoration: "underline" }}
+            >
+              Privacy Policy
+            </a>
+          </Typography>
+        </Box>
       </Box>
     </Box>
   );

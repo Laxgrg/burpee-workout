@@ -1623,6 +1623,42 @@ export default function Dashboard({
             </MenuItem>
           </Menu>
         )}
+        {/* iOS / Android availability banner */}
+        <Box
+          sx={{
+            mt: 3,
+            p: 2.5,
+            borderRadius: 2,
+            border: "1px solid rgba(255,51,102,0.25)",
+            background: "rgba(255,51,102,0.05)",
+            display: "flex",
+            alignItems: "center",
+            gap: 2,
+            flexWrap: "wrap",
+          }}
+        >
+          <Box sx={{ flex: 1, minWidth: 180 }}>
+            <Typography variant="subtitle2" fontWeight={700} mb={0.25}>
+              📱 Also available on iOS
+            </Typography>
+            <Typography variant="caption" color="text.secondary">
+              Your workouts sync automatically. Android coming soon.
+            </Typography>
+          </Box>
+          <Stack direction="row" spacing={1} flexWrap="wrap">
+            <Chip
+              label="iOS — Available"
+              size="small"
+              sx={{ bgcolor: "rgba(255,51,102,0.15)", color: "primary.main", fontWeight: 600 }}
+            />
+            <Chip
+              label="Android — Soon"
+              size="small"
+              variant="outlined"
+              sx={{ borderColor: "rgba(255,255,255,0.15)", color: "text.secondary" }}
+            />
+          </Stack>
+        </Box>
       </motion.div>
     </Box>
   );

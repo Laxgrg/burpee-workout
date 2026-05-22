@@ -13,6 +13,7 @@ dist/
 # Misc
 .DS_Store
 .env
+.claude/settings.local.json
 .env.n8n
 .env.local
 .env.development.local

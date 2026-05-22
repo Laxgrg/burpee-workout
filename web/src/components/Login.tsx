@@ -24,7 +24,9 @@ import {
   GoogleAuthProvider,
   getAdditionalUserInfo,
 } from "firebase/auth";
-import { auth, missingFirebaseEnvVars } from "../lib/firebase";
+import { auth, db, missingFirebaseEnvVars } from "../lib/firebase";
+import { doc, setDoc } from "firebase/firestore";
+import { isAllowlisted } from "../lib/allowlist";
 import { useRouter } from "next/navigation";
 
 // After a user signs up or logs in, check if they paid before creating an account
@@ -43,6 +45,15 @@ async function claimPendingSubscription(uid: string, email: string, idToken: str
     }
   } catch (err) {
     console.error("Failed to claim pending subscription:", err);
+  }
+}
+
+async function stampAdminIfAllowlisted(uid: string, email: string | null) {
+  if (!db || !email || !isAllowlisted(email)) return;
+  try {
+    await setDoc(doc(db, "users", uid), { isAdmin: true }, { merge: true });
+  } catch {
+    // non-critical — swallow silently
   }
 }
 
@@ -128,9 +139,8 @@ export default function Login({ onBackToInfo }: LoginProps) {
         }
       }
 
-      // If the user paid via Stripe before creating an account, link the
-      // pending advanced subscription to their new Firebase account now.
       const idToken = await credential.user.getIdToken();
+      await stampAdminIfAllowlisted(credential.user.uid, email);
       await claimPendingSubscription(credential.user.uid, email, idToken);
 
       const nextPath =
@@ -201,7 +211,7 @@ export default function Login({ onBackToInfo }: LoginProps) {
         await sendWelcomeEmail(credential.user.uid, credential.user.email!, idToken);
       }
 
-      // Always attempt claim — safe no-op if no pending subscription exists.
+      await stampAdminIfAllowlisted(credential.user.uid, credential.user.email);
       await claimPendingSubscription(credential.user.uid, credential.user.email!, idToken);
 
       const nextPath =

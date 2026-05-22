@@ -49,16 +49,18 @@ export default function PricingPage() {
   const formattedTrialEnd = trialEndsAt
     ? new Date(trialEndsAt).toLocaleDateString()
     : null;
-  const [checkoutLoading, setCheckoutLoading] = useState(false);
+  const [checkoutLoading, setCheckoutLoading] = useState<"monthly" | "yearly" | null>(null);
   const [portalLoading, setPortalLoading] = useState(false);
+  const [selectedPlan, setSelectedPlan] = useState<"monthly" | "yearly">("yearly");
   const router = useRouter();
-  const handleUpgrade = async () => {
+
+  const handleUpgrade = async (plan: "monthly" | "yearly") => {
     if (!user) {
       router.push("/login?next=/pricing");
       return;
     }
 
-    setCheckoutLoading(true);
+    setCheckoutLoading(plan);
     setCheckoutError(null);
     try {
       const idToken = await user.getIdToken();
@@ -70,6 +72,7 @@ export default function PricingPage() {
         },
         body: JSON.stringify({
           userEmail: user?.email ?? null,
+          plan,
         }),
       });
       const { url, error } = await res.json();
@@ -79,7 +82,7 @@ export default function PricingPage() {
       window.location.href = url;
     } catch (err) {
       console.error("Checkout error:", err);
-      setCheckoutLoading(false);
+      setCheckoutLoading(null);
       const message = err instanceof Error ? err.message : String(err);
       setCheckoutError(message);
     }
@@ -331,19 +334,26 @@ export default function PricingPage() {
                   )}
 
                   {isTrialing && (
-                    <Button
-                      fullWidth
-                      variant="outlined"
-                      onClick={handleUpgrade}
-                      disabled={checkoutLoading}
-                      sx={{
-                        mt: 1.5,
-                        borderColor: "rgba(255,255,255,0.25)",
-                        color: "white",
-                      }}
-                    >
-                      {checkoutLoading ? "Redirecting..." : "Subscribe now"}
-                    </Button>
+                    <Box sx={{ mt: 1.5 }}>
+                      <Box sx={{ display: "flex", gap: 1, mb: 1 }}>
+                        <Button fullWidth variant={selectedPlan === "monthly" ? "contained" : "outlined"}
+                          onClick={() => setSelectedPlan("monthly")}
+                          sx={{ borderColor: "rgba(255,255,255,0.25)", color: selectedPlan === "monthly" ? "white" : "grey.400" }}>
+                          $5 / mo
+                        </Button>
+                        <Button fullWidth variant={selectedPlan === "yearly" ? "contained" : "outlined"}
+                          onClick={() => setSelectedPlan("yearly")}
+                          sx={{ borderColor: "rgba(255,255,255,0.25)", color: selectedPlan === "yearly" ? "white" : "grey.400" }}>
+                          $39 / yr
+                        </Button>
+                      </Box>
+                      <Button fullWidth variant="outlined"
+                        onClick={() => handleUpgrade(selectedPlan)}
+                        disabled={checkoutLoading !== null}
+                        sx={{ borderColor: "rgba(255,255,255,0.25)", color: "white" }}>
+                        {checkoutLoading ? "Redirecting..." : "Subscribe now"}
+                      </Button>
+                    </Box>
                   )}
 
                   {isPaidSubscriber && stripeCustomerId && (
@@ -368,37 +378,52 @@ export default function PricingPage() {
                   )}
                 </Box>
               ) : (
-                <Button
-                  fullWidth
-                  variant="contained"
-                  size="large"
-                  startIcon={
-                    checkoutLoading ? (
-                      <CircularProgress size={16} color="inherit" />
-                    ) : (
-                      <WorkspacePremiumIcon />
-                    )
-                  }
-                  onClick={handleUpgrade}
-                  disabled={checkoutLoading}
-                  sx={{
-                    mt: 3,
-                    py: 1.5,
-                    fontWeight: 700,
-                    fontSize: 15,
-                    borderRadius: 2,
-                    background: "linear-gradient(135deg, #f59e0b, #ef4444)",
-                    "&:hover": {
-                      background: "linear-gradient(135deg, #d97706, #dc2626)",
-                    },
-                  }}
-                >
-                  {checkoutLoading
-                    ? "Redirecting..."
-                    : user
-                      ? "Unlock Advanced"
-                      : "Sign in to unlock Advanced"}
-                </Button>
+                <Box sx={{ mt: 3 }}>
+                  {/* Plan toggle */}
+                  <Box sx={{ display: "flex", gap: 1, mb: 2 }}>
+                    <Button fullWidth variant={selectedPlan === "monthly" ? "contained" : "outlined"}
+                      onClick={() => setSelectedPlan("monthly")}
+                      sx={{
+                        borderColor: "rgba(255,255,255,0.25)",
+                        color: selectedPlan === "monthly" ? "white" : "grey.400",
+                        background: selectedPlan === "monthly" ? "rgba(255,255,255,0.15)" : "transparent",
+                      }}>
+                      $5 / month
+                    </Button>
+                    <Button fullWidth variant={selectedPlan === "yearly" ? "contained" : "outlined"}
+                      onClick={() => setSelectedPlan("yearly")}
+                      sx={{
+                        borderColor: "rgba(255,255,255,0.25)",
+                        color: selectedPlan === "yearly" ? "white" : "grey.400",
+                        background: selectedPlan === "yearly" ? "rgba(255,255,255,0.15)" : "transparent",
+                        position: "relative",
+                      }}>
+                      $39 / year
+                      <Chip label="Save $21" size="small"
+                        sx={{ ml: 1, height: 18, fontSize: 10, bgcolor: "#22c55e", color: "white" }} />
+                    </Button>
+                  </Box>
+
+                  <Button fullWidth variant="contained" size="large"
+                    startIcon={checkoutLoading ? <CircularProgress size={16} color="inherit" /> : <WorkspacePremiumIcon />}
+                    onClick={() => handleUpgrade(selectedPlan)}
+                    disabled={checkoutLoading !== null}
+                    sx={{
+                      py: 1.5, fontWeight: 700, fontSize: 15, borderRadius: 2,
+                      background: "linear-gradient(135deg, #f59e0b, #ef4444)",
+                      "&:hover": { background: "linear-gradient(135deg, #d97706, #dc2626)" },
+                    }}>
+                    {checkoutLoading
+                      ? "Redirecting..."
+                      : user
+                        ? `Unlock Advanced — ${selectedPlan === "yearly" ? "$39/yr" : "$5/mo"}`
+                        : "Sign in to unlock Advanced"}
+                  </Button>
+
+                  <Typography variant="caption" color="grey.500" sx={{ display: "block", textAlign: "center", mt: 1 }}>
+                    Cancel anytime · Syncs across web, iOS, and Android
+                  </Typography>
+                </Box>
               )}
               {checkoutError && (
                 <Alert severity="error" sx={{ mt: 2 }}>

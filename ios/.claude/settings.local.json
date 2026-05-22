@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(xcodebuild -scheme BurpeePacer -destination 'platform=iOS Simulator,name=iPhone 16' build)",
+      "Bash(xcodebuild -scheme BurpeePacer -destination 'platform=iOS Simulator,name=iPhone 17' build)",
+      "Bash(sips *)",
+      "Bash(python3 -c ' *)",
+      "Bash(python3 *)",
+      "Bash(npm run *)"
+    ]
+  }
+}

@@ -5,9 +5,12 @@ import { getAuth } from "firebase-admin/auth";
 
 export async function POST(req: NextRequest) {
   try {
-    const { userEmail, successUrl: customSuccessUrl, cancelUrl: customCancelUrl } = await req.json();
+    const { userEmail, plan, successUrl: customSuccessUrl, cancelUrl: customCancelUrl } = await req.json();
 
-    const priceId = process.env.STRIPE_PRO_PRICE_ID;
+    const priceId = plan === "yearly"
+      ? process.env.STRIPE_PRO_YEARLY_PRICE_ID
+      : process.env.STRIPE_PRO_PRICE_ID;
+
     if (!priceId) {
       return NextResponse.json(
         { error: "Stripe price ID not configured" },

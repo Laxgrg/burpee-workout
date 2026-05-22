@@ -214,6 +214,8 @@ export default function HomeScreen() {
   const [selectedDateForWorkout, setSelectedDateForWorkout] = useState<
     string | null
   >(null);
+  // Mode suggested by the timer when a Pro user finishes (N/C/H → N or C)
+  const [timerSuggestedMode, setTimerSuggestedMode] = useState<"N" | "C" | null>(null);
 
   const [currentMonth, setCurrentMonth] = useState(() =>
     startOfMonth(new Date()),
@@ -747,11 +749,19 @@ export default function HomeScreen() {
       return safeLog as WorkoutLog;
     });
 
-    const next = { ...userData, workoutLogs: safeLogs };
+    // Compute denormalized stats to match web behavior
+    const workoutStats = {
+      workoutsCompleted: safeLogs.filter((l) => l.completed).length,
+      timerVerified: safeLogs.filter(
+        (l) => l.completed && l.repsCompleted !== undefined,
+      ).length,
+    };
+
+    const next = { ...userData, workoutLogs: safeLogs, workoutStats };
     setUserData(next);
 
     try {
-      await saveUserDataDB(user.uid, { workoutLogs: safeLogs });
+      await saveUserDataDB(user.uid, { workoutLogs: safeLogs, workoutStats });
       setSyncError("");
       if (completed) {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -1518,7 +1528,11 @@ export default function HomeScreen() {
               } else if (!isPro) {
                 handleToggleWorkout(todayKey, true, undefined, repsCompleted);
               } else {
+                // Map timer mode to N or C (Hybrid counts as N for log purposes, matching web)
+                const suggestedType: "N" | "C" =
+                  mode === "C" ? "C" : "N";
                 setSelectedDateForWorkout(todayKey);
+                setTimerSuggestedMode(suggestedType);
                 setWorkoutModalVisible(true);
               }
             }}
@@ -1597,6 +1611,7 @@ export default function HomeScreen() {
                         );
                       } else {
                         setSelectedDateForWorkout(dateStr);
+                        setTimerSuggestedMode(null); // manual tap — no mode suggestion
                         setWorkoutModalVisible(true);
                       }
                     }}
@@ -1816,29 +1831,37 @@ export default function HomeScreen() {
           visible={workoutModalVisible}
           transparent
           animationType="fade"
-          onRequestClose={() => setWorkoutModalVisible(false)}
+          onRequestClose={() => { setWorkoutModalVisible(false); setTimerSuggestedMode(null); }}
         >
           <TouchableOpacity
             style={styles.modalBackdrop}
             activeOpacity={1}
-            onPress={() => setWorkoutModalVisible(false)}
+            onPress={() => { setWorkoutModalVisible(false); setTimerSuggestedMode(null); }}
           >
             <View style={styles.modalCard}>
               <Text style={styles.modalTitle}>Workout Type</Text>
-              <Text style={styles.modalSubtitle}>How did you move today?</Text>
+              <Text style={styles.modalSubtitle}>
+                {timerSuggestedMode
+                  ? `Timer detected: ${timerSuggestedMode === "N" ? "Navy Seals" : "5-Count Pushups"}. Confirm or change.`
+                  : "How did you move today?"}
+              </Text>
 
               <TouchableOpacity
-                style={styles.workoutOptionBtn}
+                style={[
+                  styles.workoutOptionBtn,
+                  timerSuggestedMode === "N" && { borderColor: "#FF3366", borderWidth: 1, borderRadius: 8 },
+                ]}
                 onPress={() => {
                   if (selectedDateForWorkout)
                     handleToggleWorkout(selectedDateForWorkout, true, "N");
                   setWorkoutModalVisible(false);
+                  setTimerSuggestedMode(null);
                 }}
               >
                 <View
                   style={[
                     styles.optionIconBox,
-                    { backgroundColor: "rgba(255, 51, 102, 0.1)" },
+                    { backgroundColor: timerSuggestedMode === "N" ? "rgba(255, 51, 102, 0.25)" : "rgba(255, 51, 102, 0.1)" },
                   ]}
                 >
                   <Text
@@ -1858,17 +1881,21 @@ export default function HomeScreen() {
               </TouchableOpacity>
 
               <TouchableOpacity
-                style={styles.workoutOptionBtn}
+                style={[
+                  styles.workoutOptionBtn,
+                  timerSuggestedMode === "C" && { borderColor: "#00E5FF", borderWidth: 1, borderRadius: 8 },
+                ]}
                 onPress={() => {
                   if (selectedDateForWorkout)
                     handleToggleWorkout(selectedDateForWorkout, true, "C");
                   setWorkoutModalVisible(false);
+                  setTimerSuggestedMode(null);
                 }}
               >
                 <View
                   style={[
                     styles.optionIconBox,
-                    { backgroundColor: "rgba(0, 229, 255, 0.1)" },
+                    { backgroundColor: timerSuggestedMode === "C" ? "rgba(0, 229, 255, 0.25)" : "rgba(0, 229, 255, 0.1)" },
                   ]}
                 >
                   <Text
@@ -1897,7 +1924,7 @@ export default function HomeScreen() {
                     paddingHorizontal: 30,
                   },
                 ]}
-                onPress={() => setWorkoutModalVisible(false)}
+                onPress={() => { setWorkoutModalVisible(false); setTimerSuggestedMode(null); }}
               >
                 <Text style={styles.modalSecondaryBtnText}>Cancel</Text>
               </TouchableOpacity>

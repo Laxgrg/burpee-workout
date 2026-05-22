@@ -55,6 +55,12 @@ export interface UserData {
   stripeCustomerId?: string;
   stripeSubscriptionId?: string;
   subscriptionStatus?: "active" | "canceled" | "past_due" | "trialing";
+
+  // Denormalized workout counts (mirrors web workoutStats)
+  workoutStats?: {
+    workoutsCompleted: number;
+    timerVerified: number;
+  };
 }
 
 export interface LevelDescription {
